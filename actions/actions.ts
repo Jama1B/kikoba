@@ -1,374 +1,185 @@
 "use server";
-import { revalidatePath } from "next/cache";
-import { eq, and } from "drizzle-orm";
-import { auth } from "@clerk/nextjs/server";
-import { redirect } from "next/navigation";
-import { z } from "zod";
+
 import { db } from "@/lib/db/drizzle";
 import {
-  loanRepayments,
+  loanPayments,
   loans,
-  members,
   monthlyContributions,
-  payments,
-  settings,
+  users,
 } from "@/lib/db/schema";
-import { useAuth } from "@clerk/nextjs";
+import { eq, sql } from "drizzle-orm";
+import { format, addMonths, differenceInMonths } from "date-fns";
 
-// Validation schemas
-const memberSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  dedication: z.coerce.number().min(1, "Dedication amount is required"),
-});
-
-const paymentSchema = z.object({
-  memberId: z.coerce.number().min(1, "Member is required"),
-  month: z.string().min(1, "Month is required"),
-  amount: z.coerce.number().min(1, "Amount is required"),
-  date: z.date(),
-});
-
-const loanSchema = z.object({
-  memberId: z.coerce.number().min(1, "Member is required"),
-  amount: z.coerce.number().min(1, "Amount is required"),
-  date: z.date(),
-});
-
-const loanRepaymentSchema = z.object({
-  loanId: z.coerce.number().min(1, "Loan is required"),
-  month: z.string().min(1, "Month is required"),
-  amount: z.coerce.number().min(1, "Amount is required"),
-});
-
-const contributionSchema = z.object({
-  memberId: z.coerce.number().min(1, "Member is required"),
-  month: z.string().min(1, "Month is required"),
-  amount: z.coerce.number().min(1, "Amount is required"),
-});
-
-// Helper function to get the current user ID
-async function getUserId() {
-  const { userId } = await useAuth();
-  if (!userId) {
-    redirect("/sign-in");
-  }
-  return userId;
+export interface UserFinancialData {
+  clerkUserId: string;
+  name: string;
+  email: string;
+  totalLoans: number;
+  totalPaid: number;
+  remainingBalance: number;
+  loansCount: number;
+  lastLoanDate: Date | null;
 }
 
-// Member actions
-export async function getMembers() {
-  const userId = await getUserId();
+// export async function getUserFinancialSummary(clerkUserId: string) {
+//   const user = await db
+//     .select({ id: users.id })
+//     .from(users)
+//     .where(eq(users.clerkUserId, clerkUserId))
+//     .execute();
 
-  try {
-    return await db.query.members.findMany({
-      where: eq(members.clerkId, userId),
-      with: {
-        payments: true,
-        loans: {
-          with: {
-            repayments: true,
-          },
-        },
-        monthlyContributions: true,
-      },
-    });
-  } catch (error) {
-    console.error("Failed to fetch members:", error);
-    throw new Error("Failed to fetch members");
-  }
-}
+//   if (!user[0]) return { totalLoans: 0, totalContributions: 0 };
 
-export async function getMember(id: number) {
-  const userId = await getUserId();
+//   const [loansResult, contributionsResult] = await Promise.all([
+//     db
+//       .select({ total: sql<string>`sum(${loans.amount})` })
+//       .from(loans)
+//       .where(eq(loans.userId, user[0].id)),
 
-  try {
-    return await db.query.members.findFirst({
-      where: and(eq(members.id, id), eq(members.clerkId, userId)),
-      with: {
-        payments: true,
-        loans: {
-          with: {
-            repayments: true,
-          },
-        },
-        monthlyContributions: true,
-      },
-    });
-  } catch (error) {
-    console.error(`Failed to fetch member with ID ${id}:`, error);
-    throw new Error("Failed to fetch member");
-  }
-}
+//     db
+//       .select({ total: sql<string>`sum(${monthlyContributions.amount})` })
+//       .from(monthlyContributions)
+//       .where(eq(monthlyContributions.userId, user[0].id)),
+//   ]);
 
-// Loan actions
-export async function addLoan(formData: FormData) {
-  const userId = await getUserId();
+//   return {
+//     totalLoans: parseFloat(loansResult[0]?.total || "0"),
+//     totalContributions: parseFloat(contributionsResult[0]?.total || "0"),
+//   };
+// }
 
-  const validatedFields = loanSchema.safeParse({
-    memberId: formData.get("memberId"),
-    amount: formData.get("amount"),
-    date: new Date(formData.get("date") as string),
+export async function getUserFinancialSummary(clerkUserId: string) {
+  const userWithRelations = await db.query.users.findFirst({
+    where: (users, { eq }) => eq(users.clerkUserId, clerkUserId),
+    with: {
+      loans: true,
+      contributions: true,
+    },
   });
 
-  if (!validatedFields.success) {
-    return {
-      error: validatedFields.error.flatten().fieldErrors,
-    };
-  }
+  if (!userWithRelations) return { totalLoans: 0, totalContributions: 0 };
 
-  const { memberId, amount, date } = validatedFields.data;
+  const totalLoans = userWithRelations.loans.reduce(
+    (sum, loan) => sum + parseFloat(loan.amount),
+    0
+  );
 
-  try {
-    // Verify member belongs to current user
-    const memberExists = await db.query.members.findFirst({
-      where: and(eq(members.id, memberId), eq(members.clerkId, userId)),
-    });
+  const totalContributions = userWithRelations.contributions.reduce(
+    (sum, contribution) => sum + parseFloat(contribution.amount),
+    0
+  );
 
-    if (!memberExists) {
-      return { error: "Member not found" };
-    }
-
-    // Calculate months for repayment (amount / 500,000)
-    const monthsForRepayment = Math.ceil(amount / 500000);
-
-    // Calculate monthly repayment amount
-    const monthlyRepaymentAmount = Math.ceil(amount / monthsForRepayment);
-
-    // Determine repayment months
-    const startDate = new Date(date);
-    const startMonth = startDate.getMonth();
-    const repaymentMonths: string[] = [];
-
-    for (let i = 0; i < monthsForRepayment; i++) {
-      const repaymentDate = new Date(startDate);
-      repaymentDate.setMonth(startMonth + i);
-      const monthName = repaymentDate
-        .toLocaleString("en-US", { month: "long" })
-        .toLowerCase();
-      repaymentMonths.push(monthName);
-    }
-
-    await db.insert(loans).values([
-      {
-        memberId,
-        amount,
-        dateIssued: date.toISOString(),
-        monthsForRepayment,
-        monthlyRepaymentAmount,
-        status: "active",
-        repaymentMonths,
-      },
-    ]);
-
-    revalidatePath("/");
-    return { success: true };
-  } catch (error) {
-    console.error("Failed to add loan:", error);
-    return { error: "Failed to add loan" };
-  }
+  return {
+    totalLoans,
+    totalContributions,
+  };
 }
 
-export async function updateLoanRepayment(formData: FormData) {
-  const userId = await getUserId();
+export async function getUsersWithLoanData() {
+  const result = await db
+    .select({
+      clerkUserId: users.clerkUserId,
+      name: users.name,
+      email: users.email,
+      totalLoans: sql<number>`COALESCE(SUM(${loans.amount}), 0)`,
+      totalPaid: sql<number>`COALESCE(SUM(${loanPayments.amount}), 0)`,
+      loansCount: sql<number>`COUNT(DISTINCT ${loans.id})`,
+      lastLoanDate: sql<Date>`MAX(${loans.takenDate})`,
+    })
+    .from(users)
+    .leftJoin(loans, eq(users.id, loans.userId))
+    .leftJoin(loanPayments, eq(loans.id, loanPayments.loanId))
+    .groupBy(users.id, users.clerkUserId, users.name, users.email)
+    .execute();
 
-  const validatedFields = loanRepaymentSchema.safeParse({
-    loanId: formData.get("loanId"),
-    month: formData.get("month"),
-    amount: formData.get("amount"),
+  return result.map((row) => ({
+    ...row,
+    totalLoans: parseFloat(row.totalLoans.toString()),
+    totalPaid: parseFloat(row.totalPaid.toString()),
+    remainingBalance:
+      parseFloat(row.totalLoans.toString()) -
+      parseFloat(row.totalPaid.toString()),
+    lastLoanDate: row.lastLoanDate ? new Date(row.lastLoanDate) : null,
+  })) as UserFinancialData[];
+}
+
+export async function getAllLoansWithPayments() {
+  const allLoans = await db.query.loans.findMany({
+    with: {
+      payments: true,
+      user: true,
+    },
+    orderBy: (loans, { desc }) => [desc(loans.takenDate)],
   });
 
-  if (!validatedFields.success) {
-    return {
-      error: validatedFields.error.flatten().fieldErrors,
-    };
-  }
-
-  const { loanId, month, amount } = validatedFields.data;
-
-  try {
-    // Verify loan belongs to current user
-    const loan = await db.query.loans.findFirst({
-      where: eq(loans.id, loanId),
-      with: {
-        member: true,
-        repayments: true,
-      },
-    });
-
-    if (!loan || loan.member.userId !== userId) {
-      return { error: "Loan not found" };
-    }
-
-    // Check if repayment already exists
-    const existingRepayment = await db.query.loanRepayments.findFirst({
-      where: and(
-        eq(loanRepayments.loanId, loanId),
-        eq(loanRepayments.month, month)
-      ),
-    });
-
-    if (existingRepayment) {
-      // Update existing repayment
-      await db
-        .update(loanRepayments)
-        .set({
-          amount,
-          updatedAt: new Date(),
-        })
-        .where(eq(loanRepayments.id, existingRepayment.id));
-    } else {
-      // Create new repayment
-      await db.insert(loanRepayments).values({
-        loanId,
-        month,
-        amount,
-        date: new Date().toISOString(),
-      });
-    }
-
-    // Check if loan is fully paid
-    const totalPaid = [...loan.repayments.map((r) => r.amount), amount].reduce(
-      (sum, a) => sum + a,
+  return allLoans.map((loan) => {
+    const totalPaid = loan.payments.reduce(
+      (sum, payment) => sum + parseFloat(payment.amount),
       0
     );
 
-    if (totalPaid >= loan.amount && loan.status !== "paid") {
-      // Update loan status to paid
-      await db
-        .update(loans)
-        .set({
-          status: "paid",
-          updatedAt: new Date(),
-        })
-        .where(eq(loans.id, loanId));
-    }
+    // Calculate repayment duration based on payments
+    const paymentMonths = loan.payments.map((p) => p.paidAt);
+    const lastPaymentMonth =
+      paymentMonths.length > 0
+        ? Math.max(...paymentMonths.map((d) => d.getTime()))
+        : loan.takenDate;
 
-    revalidatePath("/");
-    return { success: true };
-  } catch (error) {
-    console.error("Failed to update loan repayment:", error);
-    return { error: "Failed to update loan repayment" };
-  }
-}
+    // Estimate repayment duration as 3 months if no payments exist
+    const monthsForRepayment =
+      paymentMonths.length > 0
+        ? differenceInMonths(lastPaymentMonth, loan.takenDate) + 1
+        : 3;
 
-// Monthly contribution actions
-export async function addMonthlyContribution(formData: FormData) {
-  const userId = await getUserId();
-
-  const validatedFields = contributionSchema.safeParse({
-    memberId: formData.get("memberId"),
-    month: formData.get("month"),
-    amount: formData.get("amount"),
-  });
-
-  if (!validatedFields.success) {
-    return {
-      error: validatedFields.error.flatten().fieldErrors,
-    };
-  }
-
-  const { memberId, month, amount } = validatedFields.data;
-
-  try {
-    // Verify member belongs to current user
-    const memberExists = await db.query.members.findFirst({
-      where: and(eq(members.id, memberId), eq(members.userId, userId)),
-    });
-
-    if (!memberExists) {
-      return { error: "Member not found" };
-    }
-
-    // Check if contribution already exists
-    const existingContribution = await db.query.monthlyContributions.findFirst({
-      where: and(
-        eq(monthlyContributions.memberId, memberId),
-        eq(monthlyContributions.month, month)
-      ),
-    });
-
-    if (existingContribution) {
-      // Update existing contribution
-      await db
-        .update(monthlyContributions)
-        .set({
-          amount,
-          updatedAt: new Date(),
-        })
-        .where(eq(monthlyContributions.id, existingContribution.id));
-    } else {
-      // Create new contribution
-      await db.insert(monthlyContributions).values({
-        memberId,
-        month,
-        amount,
-      });
-    }
-
-    revalidatePath("/");
-    return { success: true };
-  } catch (error) {
-    console.error("Failed to add monthly contribution:", error);
-    return { error: "Failed to add monthly contribution" };
-  }
-}
-
-// Settings actions
-export async function getNextMeetingDate() {
-  const userId = await getUserId();
-
-  try {
-    const setting = await db.query.settings.findFirst({
-      where: eq(settings.userId, userId),
-    });
-
-    return (
-      setting?.nextMeetingDate ||
-      new Date(new Date().setDate(new Date().getDate() + 14))
+    // Generate repayment months array
+    const repaymentMonths = Array.from({ length: monthsForRepayment }, (_, i) =>
+      format(addMonths(loan.takenDate, i), "MMMM").toLowerCase()
     );
-  } catch (error) {
-    console.error("Failed to fetch next meeting date:", error);
-    return new Date(new Date().setDate(new Date().getDate() + 14));
-  }
+
+    // Create repayments object
+    const repayments = loan.payments.reduce(
+      (acc, payment) => {
+        const month = format(payment.paidAt, "MMMM").toLowerCase();
+        const amount = parseFloat(payment.amount);
+        acc[month] = (acc[month] || 0) + amount;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+
+    return {
+      id: loan.id,
+      amount: parseFloat(loan.amount),
+      memberName: loan.user.name,
+      clerkId: loan.user.clerkUserId,
+      dateIssued: format(loan.takenDate, "yyyy-MM-dd"),
+      monthsForRepayment,
+      monthlyRepaymentAmount: Math.round(
+        parseFloat(loan.amount) / monthsForRepayment
+      ),
+      status: loan.status,
+      repaymentMonths,
+      repayments,
+      remainingAmount: parseFloat(loan.amount) - totalPaid,
+    };
+  });
 }
+// export async function getAllContributions() {
+//   const allContributions = await db.query.monthlyContributions.findMany({
+//     with: {
+//       user: true,
+//     },
+//     orderBy: (monthlyContributions, { desc }) => [
+//       desc(monthlyContributions.createdAt),
+//     ],
+//   });
 
-export async function updateNextMeetingDate(formData: FormData) {
-  const userId = await getUserId();
-  const dateStr = formData.get("date") as string;
-
-  if (!dateStr) {
-    return { error: "Date is required" };
-  }
-
-  const date = new Date(dateStr);
-
-  try {
-    // Check if settings already exist
-    const existingSettings = await db.query.settings.findFirst({
-      where: eq(settings.userId, userId),
-    });
-
-    if (existingSettings) {
-      // Update existing settings
-      await db
-        .update(settings)
-        .set({
-          nextMeetingDate: date.toISOString(),
-          updatedAt: new Date(),
-        })
-        .where(eq(settings.id, existingSettings.id));
-    } else {
-      // Create new settings
-      await db.insert(settings).values({
-        userId,
-        nextMeetingDate: date.toISOString(),
-      });
-    }
-
-    revalidatePath("/");
-    return { success: true };
-  } catch (error) {
-    console.error("Failed to update next meeting date:", error);
-    return { error: "Failed to update next meeting date" };
-  }
-}
+//   return allContributions.map((contribution) => ({
+//     id: contribution.id,
+//     amount: parseFloat(contribution.amount),
+//     memberName: contribution.user.name,
+//     clerkId: contribution.user.clerkUserId,
+//     month: format(contribution.month, "MMMM").toLowerCase(),
+//     createdAt: format(contribution.createdAt, "yyyy-MM-dd"),
+//   }));
+// }

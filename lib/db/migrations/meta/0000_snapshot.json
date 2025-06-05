@@ -1,39 +1,101 @@
 {
-  "id": "9d25784d-94c8-43d6-a283-ca5ac6718e9e",
+  "id": "20c660d9-e6df-41c9-bcbe-8bf332c38998",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.loan_repayments": {
-      "name": "loan_repayments",
+    "public.loan_payment": {
+      "name": "loan_payment",
       "schema": "",
       "columns": {
         "id": {
           "name": "id",
-          "type": "serial",
+          "type": "uuid",
           "primaryKey": true,
-          "notNull": true
+          "notNull": true,
+          "default": "gen_random_uuid()"
         },
         "loan_id": {
           "name": "loan_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "month": {
-          "name": "month",
-          "type": "varchar(50)",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
         "amount": {
           "name": "amount",
-          "type": "integer",
+          "type": "numeric(15, 2)",
           "primaryKey": false,
           "notNull": true
         },
-        "date": {
-          "name": "date",
+        "paid_at": {
+          "name": "paid_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "loan_payment_loan_id_loan_id_fk": {
+          "name": "loan_payment_loan_id_loan_id_fk",
+          "tableFrom": "loan_payment",
+          "tableTo": "loan",
+          "columnsFrom": [
+            "loan_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.loan": {
+      "name": "loan",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount": {
+          "name": "amount",
+          "type": "numeric(15, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "loan_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "taken_date": {
+          "name": "taken_date",
           "type": "date",
           "primaryKey": false,
           "notNull": true
@@ -44,73 +106,50 @@
           "primaryKey": false,
           "notNull": false,
           "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "now()"
         }
       },
       "indexes": {},
-      "foreignKeys": {},
+      "foreignKeys": {
+        "loan_user_id_user_id_fk": {
+          "name": "loan_user_id_user_id_fk",
+          "tableFrom": "loan",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.loans": {
-      "name": "loans",
+    "public.meeting_date": {
+      "name": "meeting_date",
       "schema": "",
       "columns": {
         "id": {
           "name": "id",
-          "type": "serial",
+          "type": "uuid",
           "primaryKey": true,
-          "notNull": true
+          "notNull": true,
+          "default": "gen_random_uuid()"
         },
-        "member_id": {
-          "name": "member_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "amount": {
-          "name": "amount",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "date_issued": {
-          "name": "date_issued",
+        "meeting_date": {
+          "name": "meeting_date",
           "type": "date",
           "primaryKey": false,
           "notNull": true
         },
-        "months_for_repayment": {
-          "name": "months_for_repayment",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "monthly_repayment_amount": {
-          "name": "monthly_repayment_amount",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'active'"
-        },
-        "repayment_months": {
-          "name": "repayment_months",
-          "type": "json",
+        "notes": {
+          "name": "notes",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -120,13 +159,6 @@
           "primaryKey": false,
           "notNull": false,
           "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "now()"
         }
       },
       "indexes": {},
@@ -137,14 +169,86 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.members": {
-      "name": "members",
+    "public.monthly_contribution": {
+      "name": "monthly_contribution",
       "schema": "",
       "columns": {
         "id": {
           "name": "id",
-          "type": "serial",
+          "type": "uuid",
           "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount": {
+          "name": "amount",
+          "type": "numeric(15, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "month": {
+          "name": "month",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "paid_at": {
+          "name": "paid_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "monthly_contribution_user_id_user_id_fk": {
+          "name": "monthly_contribution_user_id_user_id_fk",
+          "tableFrom": "monthly_contribution",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.user": {
+      "name": "user",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "clerk_user_id": {
+          "name": "clerk_user_id",
+          "type": "varchar(255)",
+          "primaryKey": false,
           "notNull": true
         },
         "name": {
@@ -153,14 +257,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "dedication": {
-          "name": "dedication",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
+        "email": {
+          "name": "email",
           "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true
@@ -171,178 +269,42 @@
           "primaryKey": false,
           "notNull": false,
           "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "now()"
         }
       },
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.monthly_contributions": {
-      "name": "monthly_contributions",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
+      "uniqueConstraints": {
+        "user_clerk_user_id_unique": {
+          "name": "user_clerk_user_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "clerk_user_id"
+          ]
         },
-        "member_id": {
-          "name": "member_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "month": {
-          "name": "month",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "amount": {
-          "name": "amount",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "now()"
+        "user_email_unique": {
+          "name": "user_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
         }
       },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.payments": {
-      "name": "payments",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "member_id": {
-          "name": "member_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "month": {
-          "name": "month",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "amount": {
-          "name": "amount",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "date": {
-          "name": "date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.settings": {
-      "name": "settings",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "serial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "next_meeting_date": {
-          "name": "next_meeting_date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
     }
   },
-  "enums": {},
+  "enums": {
+    "public.loan_status": {
+      "name": "loan_status",
+      "schema": "public",
+      "values": [
+        "active",
+        "paid"
+      ]
+    }
+  },
   "schemas": {},
   "sequences": {},
   "roles": {},

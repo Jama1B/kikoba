@@ -4,87 +4,101 @@ import {
   serial,
   varchar,
   integer,
-  timestamp,
-  json,
+  numeric,
   date,
+  timestamp,
+  text,
+  pgEnum,
+  index,
+  uuid,
 } from "drizzle-orm/pg-core";
 
-// Members table
-export const members = pgTable("members", {
-  id: serial("id").primaryKey(),
+// Enums
+export const loanStatusEnum = pgEnum("loan_status", ["active", "paid"]);
+
+// User Table with Clerk ID
+export const users = pgTable("user", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  clerkUserId: varchar("clerk_user_id", { length: 255 }).unique().notNull(),
   name: varchar("name", { length: 255 }).notNull(),
-  dedication: integer("dedication").notNull(),
-  clerkId: varchar("clerk_Id", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }).unique().notNull(),
   createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Loans table
-export const loans = pgTable("loans", {
-  id: serial("id").primaryKey(),
-  memberId: integer("member_id").notNull(),
-  amount: integer("amount").notNull(),
-  dateIssued: date("date_issued").notNull(),
+// Loan Table (now references clerkUserId)
+export const loans = pgTable("loan", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .references(() => users.id)
+    .notNull(),
+  amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
   monthsForRepayment: integer("months_for_repayment").notNull(),
-  monthlyRepaymentAmount: integer("monthly_repayment_amount").notNull(),
-  status: varchar("status", { length: 50 }).notNull().default("active"),
-  repaymentMonths: json("repayment_months").$type<string[]>(),
+  status: loanStatusEnum("status").notNull().default("active"),
+  takenDate: date("taken_date").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Loan repayments table
-export const loanRepayments = pgTable("loan_repayments", {
-  id: serial("id").primaryKey(),
-  loanId: integer("loan_id").notNull(),
-  month: varchar("month", { length: 50 }).notNull(),
-  amount: integer("amount").notNull(),
-  date: date("date").notNull(),
+// Monthly Contribution Table (references clerkUserId)
+export const monthlyContributions = pgTable("monthly_contribution", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .references(() => users.id)
+    .notNull(),
+  amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
+  month: date("month").notNull(),
+  paidAt: timestamp("paid_at").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Monthly contributions table
-export const monthlyContributions = pgTable("monthly_contributions", {
-  id: serial("id").primaryKey(),
-  memberId: integer("member_id").notNull(),
-  month: varchar("month", { length: 50 }).notNull(),
-  amount: integer("amount").notNull(),
+// Other tables remain the same as previous...
+
+// Loan Payment Table
+export const loanPayments = pgTable("loan_payment", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  loanId: uuid("loan_id")
+    .references(() => loans.id)
+    .notNull(),
+  amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
+  paidAt: timestamp("paid_at").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Settings table
-export const settings = pgTable("settings", {
-  id: serial("id").primaryKey(),
-  userId: varchar("user_id", { length: 255 }).notNull(),
-  nextMeetingDate: date("next_meeting_date"),
+// Meeting Dates Table
+export const meetingDates = pgTable("meeting_date", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  meetingDate: date("meeting_date").notNull(),
+  notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Relations
-export const loansRelations = relations(loans, ({ one, many }) => ({
-  member: one(members, {
-    fields: [loans.memberId],
-    references: [members.id],
-  }),
-  repayments: many(loanRepayments),
+///\/ Relations
+export const usersRelations = relations(users, ({ many }) => ({
+  loans: many(loans),
+  contributions: many(monthlyContributions),
+  payments: many(loanPayments),
 }));
 
-export const loanRepaymentsRelations = relations(loanRepayments, ({ one }) => ({
-  loan: one(loans, {
-    fields: [loanRepayments.loanId],
-    references: [loans.id],
+export const loansRelations = relations(loans, ({ one, many }) => ({
+  user: one(users, {
+    fields: [loans.userId],
+    references: [users.id],
   }),
+  payments: many(loanPayments),
 }));
 
 export const monthlyContributionsRelations = relations(
   monthlyContributions,
   ({ one }) => ({
-    member: one(members, {
-      fields: [monthlyContributions.memberId],
-      references: [members.id],
+    user: one(users, {
+      fields: [monthlyContributions.userId],
+      references: [users.id],
     }),
   })
 );
+
+export const loanPaymentsRelations = relations(loanPayments, ({ one }) => ({
+  loan: one(loans, {
+    fields: [loanPayments.loanId],
+    references: [loans.id],
+  }),
+}));

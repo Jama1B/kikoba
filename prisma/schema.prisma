@@ -1,0 +1,61 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum LoanStatus {
+  active
+  paid
+}
+
+model User {
+  id           String               @id @default(uuid())
+  clerkUserId  String               @unique
+  name         String
+  email        String               @unique
+  createdAt    DateTime             @default(now())
+  loans        Loan[]
+  contributions MonthlyContribution[]
+}
+
+model Loan {
+  id         String       @id @default(uuid())
+  user       User         @relation(fields: [userId], references: [id])
+  userId     String
+  amount     Decimal
+  status     LoanStatus   @default(active)
+  takenDate  DateTime
+  createdAt  DateTime     @default(now())
+  payments   LoanPayment[]
+}
+
+model MonthlyContribution {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  amount    Decimal
+  month     DateTime
+  paidAt    DateTime
+  createdAt DateTime @default(now())
+}
+
+model LoanPayment {
+  id        String   @id @default(uuid())
+  loan      Loan     @relation(fields: [loanId], references: [id])
+  loanId    String
+  amount    Decimal
+  paidAt    DateTime
+  createdAt DateTime @default(now())
+}
+
+model MeetingDates {
+  id          String   @id @default(uuid())
+  meetingDate DateTime
+  notes       String?
+  createdAt   DateTime @default(now())
+}
