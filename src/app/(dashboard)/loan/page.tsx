@@ -1,7 +1,7 @@
-import { Loan } from "@/src/types/datatypes";
+import { Loan } from "@/types/datatypes";
 import { columns } from "./columns";
 import { DataTable } from "./data-table";
-import { getAllLoansWithPayments } from "@/src/actions/actions";
+import { getAllLoansWithPayments } from "@/actions/actions";
 
 // async function getData(): Promise<Loan[]> {
 //   // Fetch data from your API here.

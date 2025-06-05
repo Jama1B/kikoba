@@ -1,9 +1,9 @@
 "use client";
-import { AddLoanRepaymentDialog } from "@/src/components/LoanDialog";
-import { Badge } from "@/src/components/ui/badge";
-import { Button } from "@/src/components/ui/button";
-import { DropdownMenuItem } from "@/src/components/ui/dropdown-menu";
-import { Loan } from "@/src/types/datatypes";
+import { AddLoanRepaymentDialog } from "@/components/LoanDialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { Loan } from "@/types/datatypes";
 import {
   DropdownMenu,
   DropdownMenuContent,
