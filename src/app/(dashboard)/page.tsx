@@ -8,7 +8,7 @@ export default async function Home() {
 
   return (
     <div>
-      <div className="flex flex-col space-y-4 p-5 ">
+      <div className="flex flex-col space-y-4 px-5 ">
         <h1 className="font-semibold text-5xl">Welcome, {user?.firstName}!</h1>
         <OverviewCard userid={userId} />
       </div>
