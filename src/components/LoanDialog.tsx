@@ -2,8 +2,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { Check, ChevronsUpDown, AlertCircle } from "lucide-react";
-import { cn } from "@/src/lib/utils";
-import { Button } from "@/src/components/ui/button";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import {
   Command,
   CommandEmpty,
@@ -11,7 +11,7 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/src/components/ui/command";
+} from "@/components/ui/command";
 import {
   Dialog,
   DialogContent,
@@ -20,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/src/components/ui/dialog";
+} from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
@@ -29,17 +29,17 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/src/components/ui/form";
-import { Input } from "@/src/components/ui/input";
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/src/components/ui/popover";
+} from "@/components/ui/popover";
 import { toast } from "sonner";
 
-import { Alert, AlertDescription, AlertTitle } from "@/src/components/ui/alert";
-import { updateLoanRepayment } from "@/src/actions/actions";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { updateLoanRepayment } from "@/actions/actions";
 
 interface AddLoanRepaymentDialogProps {
   loan: any;

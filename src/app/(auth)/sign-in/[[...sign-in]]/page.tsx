@@ -1,8 +1,8 @@
-import { AuroraBackground } from "@/src/components/ui/aurora-background";
-import { BackgroundBeams } from "@/src/components/ui/background-beams";
-import { BackgroundLines } from "@/src/components/ui/background-lines";
-import { FlipWords } from "@/src/components/ui/flip-words";
-import { TextHoverEffect } from "@/src/components/ui/text-hover-effect";
+import { AuroraBackground } from "@/components/ui/aurora-background";
+import { BackgroundBeams } from "@/components/ui/background-beams";
+import { BackgroundLines } from "@/components/ui/background-lines";
+import { FlipWords } from "@/components/ui/flip-words";
+import { TextHoverEffect } from "@/components/ui/text-hover-effect";
 import { SignIn, ClerkLoaded, ClerkLoading } from "@clerk/nextjs";
 import { Loader2 } from "lucide-react";
 import Image from "next/image";
